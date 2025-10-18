@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>مدرّب دوال Excel – تعلمها بسهولة وبأسلوب عملي</title>
+  <style>
+    :root{
+      --bg:#0b0f14; --card:#111821; --muted:#1b2634; --text:#ecf2f8; --sub:#b6c2ce; --brand:#3aa5ff;
+      --radius:16px; --radius-sm:12px; --shadow:0 10px 30px rgba(0,0,0,.25);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#0a0e13 0%,#0b1118 100%);color:var(--text);font-family:"Cairo",sans-serif}
+    header{position:sticky;top:0;z-index:10;background:rgba(11,15,20,.7);backdrop-filter:blur(10px);border-bottom:1px solid #15202b}
+    .wrap{max-width:1100px;margin:auto;padding:18px}
+    h1{margin:0;font-size:clamp(22px,2.8vw,34px)}
+    .subtitle{color:var(--sub);font-size:14px;margin-top:6px}
+    .search{display:flex;gap:10px;margin-top:12px}
+    .search input{flex:1;padding:14px 16px;border-radius:12px;border:1px solid #203040;background:#0f1621;color:var(--text)}
+    .search button{padding:12px 16px;border-radius:12px;border:1px solid #203040;background:var(--brand);color:#001526;font-weight:700;cursor:pointer}
+    .filters{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+    .chip{padding:8px 12px;border-radius:999px;background:#0f1621;border:1px solid #203040;color:var(--sub);cursor:pointer;font-size:13px}
+    .chip.active{background:#0f2538;border-color:#2a6bbf;color:#cfe8ff}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;margin-top:18px}
+    .card{background:var(--card);border:1px solid #162332;border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:10px}
+    .badge{font-size:12px;color:#b3c6d6;background:#0f2538;border:1px solid #1a3a5a;padding:4px 8px;border-radius:999px;width:max-content}
+    .syntax{font-family:monospace;color:#d6f0ff;background:#0a1220;border:1px solid #122035;padding:10px;border-radius:var(--radius-sm)}
+    .example{color:#cbd9e6;font-size:13px}
+    .btn{padding:9px 12px;border-radius:10px;border:1px solid #203040;background:#122033;color:#e2edf6;font-size:13px;cursor:pointer}
+    .btn.brand{background:linear-gradient(135deg,#3aa5ff,#2ed0ff);color:#00223a;border:none}
+    .btn:active{transform:translateY(1px)}
+    .footer{color:#8ea6b8;text-align:center;padding:24px}
+    /* شاشة التحميل */
+    #loader{position:fixed;inset:0;background:#070a0d;color:white;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;animation:fadeout 1s ease 5s forwards}
+    @keyframes fadeout{to{opacity:0;visibility:hidden}}
+    .spinner{width:50px;height:50px;border:5px solid #1a1f27;border-top:5px solid var(--brand);border-radius:50%;animation:spin 1s linear infinite;margin-bottom:20px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+  <div id="loader">
+    <div class="spinner"></div>
+    <h2>مرحبا مهندسيناااا الكرام ,, هذا شرح لكم بتقدروا تشاركوه مع اي حد  </h2>
+    <h3>ليث عوض  </h3>
+
+  </div>
+
+  <header>
+    <div class="wrap">
+      <h1>مدرّب دوال <span style="color:var(--brand)">Excel</span></h1>
+      <div class="subtitle">ابحث عن أي دالة، شاهد الصيغة والأمثلة، وجرّبها مباشرة.</div>
+      <div class="search">
+        <input id="q" placeholder="ابحث عن دالة (مثال: IF, LEFT, جمع, نصوص)..." />
+        <button id="clear">مسح</button>
+      </div>
+      <div class="filters" id="filters"></div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="grid" id="cards"></section>
+    <div class="footer">🔎 ملاحظة: النتائج تقريبية لأغراض التعلم فقط.</div>
+  </main>
+
+  <script>
+    // ===== شاشة التحميل: تُخفى بعد 5 ثوانٍ =====
+    setTimeout(()=>{ document.getElementById('loader').style.display='none'; }, 3500);
+
+    // ===== بيانات الفئات =====
+    const CATS=[
+      {key:'الكل',label:'الكل'},
+      {key:'رياضيات',label:'رياضيات'},
+      {key:'إحصاء',label:'إحصاء'},
+      {key:'نصوص',label:'نصوص'},
+      {key:'منطق',label:'منطق'},
+      {key:'تاريخ ووقت',label:'تاريخ ووقت'},
+      {key:'بحث ومراجع',label:'بحث ومراجع'},
+      {key:'مالية',label:'مالية'},
+      {key:'معلوماتية',label:'معلوماتية'},
+      {key:'هندسية',label:'هندسية'},
+      {key:'قاعدة بيانات',label:'قاعدة بيانات'},
+      {key:'متفرقات',label:'متفرقات'}
+    ];
+
+    // ===== دوال تفصيلية مع تطبيق حي (عربية فقط) =====
+    const DETAILED=[
+      {name:'SUM',cat:'رياضيات',syntax:'=SUM(القيمة1,القيمة2,...)',desc:'جمع الأرقام وإرجاع المجموع.',example:'=SUM(10,20,30) → 60'},
+      {name:'AVERAGE',cat:'إحصاء',syntax:'=AVERAGE(القيمة1,القيمة2,...)',desc:'حساب المتوسط الحسابي.',example:'=AVERAGE(10,20,30) → 20'},
+      {name:'PRODUCT',cat:'رياضيات',syntax:'=PRODUCT(القيمة1,القيمة2,...)',desc:'حاصل ضرب الأرقام.',example:'=PRODUCT(2,3,4) → 24'},
+      {name:'POWER',cat:'رياضيات',syntax:'=POWER(الرقم,القوة)',desc:'رفع رقم لقوة محددة.',example:'=POWER(2,3) → 8'},
+      {name:'SQRT',cat:'رياضيات',syntax:'=SQRT(الرقم)',desc:'الجذر التربيعي للرقم.',example:'=SQRT(9) → 3'},
+      {name:'RANDBETWEEN',cat:'رياضيات',syntax:'=RANDBETWEEN(أدنى,أعلى)',desc:'إرجاع رقم عشوائي بين حدين.',example:'=RANDBETWEEN(1,10) → رقم عشوائي'},
+
+      {name:'MAX',cat:'إحصاء',syntax:'=MAX(القيمة1,القيمة2,...)',desc:'إرجاع أكبر قيمة.',example:'=MAX(5,9,7) → 9'},
+      {name:'MIN',cat:'إحصاء',syntax:'=MIN(القيمة1,القيمة2,...)',desc:'إرجاع أصغر قيمة.',example:'=MIN(5,9,7) → 5'},
+      {name:'MEDIAN',cat:'إحصاء',syntax:'=MEDIAN(القيمة1,القيمة2,...)',desc:'الوسيط الحسابي.',example:'=MEDIAN(5,1,9) → 5'},
+      {name:'MODE',cat:'إحصاء',syntax:'=MODE(القيمة1,القيمة2,...)',desc:'المنوال (الأكثر تكرارًا).',example:'=MODE(2,3,3,4) → 3'},
+      {name:'STDEV',cat:'إحصاء',syntax:'=STDEV(القيمة1,القيمة2,...)',desc:'الانحراف المعياري تقديريًا.',example:'=STDEV(2,4,4,4,5,5,7,9) → 2'},
+
+      {name:'LEFT',cat:'نصوص',syntax:'=LEFT(النص,[عدد])',desc:'إرجاع محارف من بداية النص.',example:'=LEFT("Excel",2) → "Ex"'},
+      {name:'RIGHT',cat:'نصوص',syntax:'=RIGHT(النص,[عدد])',desc:'إرجاع محارف من نهاية النص.',example:'=RIGHT("Excel",2) → "el"'},
+      {name:'MID',cat:'نصوص',syntax:'=MID(النص,بداية,عدد)',desc:'إرجاع جزء من النص من موضع محدد.',example:'=MID("Excel",2,3) → "xce"'},
+      {name:'LEN',cat:'نصوص',syntax:'=LEN(النص)',desc:'عدد محارف النص.',example:'=LEN("Excel") → 5'},
+      {name:'CONCAT',cat:'نصوص',syntax:'=CONCAT(نص1,نص2,...)',desc:'دمج نصوص متعددة.',example:'=CONCAT("مرحبًا ","يا ليث") → "مرحبًا يا ليث"'},
+      {name:'TEXTJOIN',cat:'نصوص',syntax:'=TEXTJOIN(فاصل,تجاهل_فارغ,نص1,...)',desc:'دمج نصوص بفاصل محدد.',example:'=TEXTJOIN(", ",TRUE,"A","B") → A, B'},
+      {name:'UPPER',cat:'نصوص',syntax:'=UPPER(النص)',desc:'تحويل إلى أحرف كبيرة.',example:'=UPPER("excel") → EXCEL'},
+      {name:'LOWER',cat:'نصوص',syntax:'=LOWER(النص)',desc:'تحويل إلى أحرف صغيرة.',example:'=LOWER("EXCEL") → excel'},
+      {name:'PROPER',cat:'نصوص',syntax:'=PROPER(النص)',desc:'تكبير أول حرف بكل كلمة.',example:'=PROPER("mohamed ali") → Mohamed Ali'},
+      {name:'TRIM',cat:'نصوص',syntax:'=TRIM(النص)',desc:'حذف المسافات الزائدة.',example:'=TRIM("  Excel  ") → "Excel"'},
+      {name:'REPLACE',cat:'نصوص',syntax:'=REPLACE(النص,موضع,عدد,نص_جديد)',desc:'استبدال جزء من النص.',example:'=REPLACE("Excel",2,3,"ABC") → EABCl'},
+      {name:'SUBSTITUTE',cat:'نصوص',syntax:'=SUBSTITUTE(النص,قديم,جديد)',desc:'تبديل كلمة بأخرى.',example:'=SUBSTITUTE("مرحبا علي","علي","ليث") → مرحبا ليث'},
+
+      {name:'IF',cat:'منطق',syntax:'=IF(اختبار,قيمة_إذا_صحيح,قيمة_إذا_خطأ)',desc:'شرط منطقي بسيط.',example:'=IF(90>=60,"ناجح","راسب") → "ناجح"'},
+      {name:'IFS',cat:'منطق',syntax:'=IFS(شرط1,نتيجة1,شرط2,نتيجة2,...)',desc:'شروط متعددة بدلاً من IF متداخلة.',example:'=IFS(90>=90,"ممتاز",90>=60,"ناجح")'},
+      {name:'SWITCH',cat:'منطق',syntax:'=SWITCH(تعبير,قيمة1,نتيجة1,...)',desc:'اختيار نتيجة حسب قيمة.',example:'=SWITCH(2,1,"A",2,"B",3,"C") → B'},
+      {name:'AND',cat:'منطق',syntax:'=AND(شرط1,شرط2,...)',desc:'TRUE إذا كل الشروط صحيحة.',example:'=AND(5>1,3<2) → FALSE'},
+      {name:'OR',cat:'منطق',syntax:'=OR(شرط1,شرط2,...)',desc:'TRUE إذا تحقق شرط واحد.',example:'=OR(5>1,3<2) → TRUE'},
+      {name:'NOT',cat:'منطق',syntax:'=NOT(قيمة_منطقية)',desc:'عكس القيمة المنطقية.',example:'=NOT(TRUE) → FALSE'},
+
+      {name:'DATE',cat:'تاريخ ووقت',syntax:'=DATE(سنة,شهر,يوم)',desc:'إنشاء تاريخ من مكونات.',example:'=DATE(2025,10,18)'},
+      {name:'YEAR',cat:'تاريخ ووقت',syntax:'=YEAR(تاريخ)',desc:'إرجاع السنة.',example:'=YEAR(DATE(2025,10,18)) → 2025'},
+      {name:'MONTH',cat:'تاريخ ووقت',syntax:'=MONTH(تاريخ)',desc:'إرجاع الشهر.',example:'=MONTH(DATE(2025,10,18)) → 10'},
+      {name:'DAY',cat:'تاريخ ووقت',syntax:'=DAY(تاريخ)',desc:'إرجاع اليوم.',example:'=DAY(DATE(2025,10,18)) → 18'},
+      {name:'TODAY',cat:'تاريخ ووقت',syntax:'=TODAY()',desc:'تاريخ اليوم.',example:'=TODAY()'},
+      {name:'NOW',cat:'تاريخ ووقت',syntax:'=NOW()',desc:'التاريخ والوقت الآن.',example:'=NOW()'},
+      {name:'EDATE',cat:'تاريخ ووقت',syntax:'=EDATE(تاريخ,أشهر)',desc:'تاريخ بعد/قبل أشهر.',example:'=EDATE("2024-01-01",3) → 2024-04-01'},
+      {name:'EOMONTH',cat:'تاريخ ووقت',syntax:'=EOMONTH(تاريخ,أشهر)',desc:'آخر يوم في شهر بعد/قبل أشهر.',example:'=EOMONTH("2024-01-15",1) → 2024-02-29'},
+      {name:'NETWORKDAYS',cat:'تاريخ ووقت',syntax:'=NETWORKDAYS(بدء,نهاية,[عطل])',desc:'عدد أيام العمل بين تاريخين.',example:'=NETWORKDAYS("2024-01-01","2024-01-10")'},
+      {name:'WEEKDAY',cat:'تاريخ ووقت',syntax:'=WEEKDAY(تاريخ,[نوع])',desc:'رقم يوم الأسبوع.',example:'=WEEKDAY("2024-01-01") → 2'},
+      {name:'DATEDIF',cat:'تاريخ ووقت',syntax:'=DATEDIF(بدء,نهاية,وحدة)',desc:'الفرق بين تاريخين.',example:'=DATEDIF("2024-01-01","2025-01-01","Y") → 1'},
+
+      {name:'VLOOKUP',cat:'بحث ومراجع',syntax:'=VLOOKUP(قيمة,جدول,عمود,[تقريبي])',desc:'بحث عمودي في العمود الأول.',example:'=VLOOKUP("A12",الجدول,3,FALSE)'},
+      {name:'HLOOKUP',cat:'بحث ومراجع',syntax:'=HLOOKUP(قيمة,جدول,صف,[تقريبي])',desc:'بحث أفقي في الصف الأول.',example:'=HLOOKUP("كود",الجدول,2,0)'},
+      {name:'XLOOKUP',cat:'بحث ومراجع',syntax:'=XLOOKUP(قيمة,نطاق_بحث,نطاق_إرجاع,[غير_موجود])',desc:'بحث حديث مرن.',example:'=XLOOKUP("B07",A:A,C:C)'},
+      {name:'INDEX',cat:'بحث ومراجع',syntax:'=INDEX(نطاق,صف,[عمود])',desc:'إرجاع قيمة من موضع محدد.',example:'=INDEX(A1:B3,2,1)'},
+      {name:'MATCH',cat:'بحث ومراجع',syntax:'=MATCH(قيمة,نطاق,[نوع])',desc:'موقع قيمة داخل نطاق.',example:'=MATCH("علي",A1:A5,0)'},
+      {name:'FILTER',cat:'بحث ومراجع',syntax:'=FILTER(نطاق,شرط)',desc:'تصفية القيم حسب شرط.',example:'=FILTER(A2:B10,B2:B10>50)'},
+      {name:'SORT',cat:'بحث ومراجع',syntax:'=SORT(نطاق,[عمود],[ترتيب])',desc:'فرز نطاق.',example:'=SORT(A2:B10,1,1)'},
+      {name:'UNIQUE',cat:'بحث ومراجع',syntax:'=UNIQUE(نطاق)',desc:'إرجاع القيم الفريدة.',example:'=UNIQUE(A2:A10)'},
+
+      {name:'PMT',cat:'مالية',syntax:'=PMT(النسبة,الفترات,القيمة)',desc:'دفعة القرض الدورية.',example:'=PMT(0.05/12,60,30000)'},
+      {name:'IPMT',cat:'مالية',syntax:'=IPMT(النسبة,الدفعة,الفترات,القيمة)',desc:'جزء الفائدة من الدفعة.',example:'=IPMT(0.05/12,1,60,30000)'},
+      {name:'PPMT',cat:'مالية',syntax:'=PPMT(النسبة,الدفعة,الفترات,القيمة)',desc:'جزء الأصل من الدفعة.',example:'=PPMT(0.05/12,1,60,30000)'}
+    ];
+
+    // ===== قوائم ضخمة (أسماء فقط) تُحوّل تلقائيًا إلى بطاقات عامة =====
+    // ملاحظة: لمنع تضخم الكود، نضيف الكثير من الدوال بالاسم مع وصف عام.
+    const BULK = {
+      'رياضيات': `ABS,ACOS,ACOSH,ACOT,ACOTH,ASIN,ASINH,ATAN,ATAN2,ATANH,CEILING,FLOOR,ROUND,ROUNDUP,ROUNDDOWN,INT,MOD,QUOTIENT,FACT,FACTDOUBLE,COMBIN,COMBINA,PERMUT,PERMUTATIONA,PI,POWER,PRODUCT,SQRT,SQRTPI,EXP,LN,LOG,LOG10,SIGN,SIN,SINH,COS,COSH,TAN,TANH,RADIANS,DEGREES,SEC,SECH,CSC,CSCH,COT,COTH,SUMSQ,SUMX2MY2,SUMX2PY2,SUMXMY2,MROUND,RAND,RANDBETWEEN`,
+      'إحصاء': `AVERAGEA,AVERAGEIF,AVERAGEIFS,COUNT,COUNTA,COUNTBLANK,COUNTIF,COUNTIFS,GEOMEAN,HARMEAN,VAR,VARA,VARP,VARPA,STDEVA,STDEVP,STDEVPA,MEDIAN,MODE,MODE.MULT,MODE.SNGL,PERCENTILE,PERCENTILE.EXC,PERCENTILE.INC,QUARTILE,QUARTILE.EXC,QUARTILE.INC,RANK,RANK.AVG,RANK.EQ,MAXA,MINA,CONFIDENCE,CONFIDENCE.NORM,CONFIDENCE.T,CHISQ.DIST,CHISQ.DIST.RT,CHISQ.INV,CHISQ.INV.RT,NORM.DIST,NORM.INV,NORM.S.DIST,NORM.S.INV,T.DIST,T.DIST.2T,T.DIST.RT,T.INV,T.INV.2T`,
+      'نصوص': `CHAR,CLEAN,CODE,CONCATENATE,EXACT,FIND,SEARCH,LEFTB,RIGHTB,MIDB,REPT,REPLACEB,SUBSTITUTEB,VALUE,TEXT,T,NUMBERVALUE,BAHTTEXT,ROMAN,DOLLAR,UNICHAR,UNICODE`,
+      'منطق': `TRUE,FALSE,IFERROR,IFNA`,
+      'تاريخ ووقت': `DATEVALUE,DAY,DAYFRAC,DAYS,DAYS360,EOMONTH,EDATE,HOUR,MINUTE,SECOND,ISOWEEKNUM,WEEKNUM,WORKDAY,WORKDAY.INTL,NETWORKDAYS.INTL,TIME,TIMEVALUE`,
+      'بحث ومراجع': `ADDRESS,AREAS,CHOOSE,COLUMN,COLUMNS,FORMULATEXT,GETPIVOTDATA,HLOOKUP,HYPERLINK,INDIRECT,LOOKUP,OFFSET,ROW,ROWS,RTD,TRANSPOSE,VLOOKUP,XMATCH,INDEX,SEQUENCE,DROP,TAKE,WRAPROWS,WRAPCOLS,TOCOL,TOROW,CHOOSECOLS,CHOOSEROWS,UNIQUE,SORT,SORTBY,FILTER,XLOOKUP`,
+      'مالية': `ACCRINT,ACCRINTM,AMORDEGRC,AMORLINC,COUPDAYBS,COUPDAYS,COUPDAYSNC,COUPNCD,COUPNUM,COUPPCD,DB,DDB,DISC,DOLLARDE,DOLLARFR,DURATION,EFFECT,PRICE,PRICEDISC,PRICEMAT,RECEIVED,SLN,SYD,TBILLEQ,TBILLPRICE,TBILLYIELD,YIELD,YIELDDISC,YIELDMAT,PV,FV,NOMINAL,NPER,NPV,IRR,XIRR`,
+      'معلوماتية': `CELL,ERROR.TYPE,INFO,ISBLANK,ISERR,ISERROR,ISEVEN,ISFORMULA,ISLOGICAL,ISNA,ISNONTEXT,ISNUMBER,ISODD,ISREF,ISTEXT,N,NA,SHEET,SHEETS,TYPE`,
+      'هندسية': `BESSELI,BESSELJ,BESSELK,BESSELY,CONVERT,DELTA,ERF,ERFC,ERF.PRECISE,ERFC.PRECISE,GESTEP,IMSIN,IMCOS,IMTAN,IMLOG10,IMLOG2,IMLN,IMPOWER,IMABS,IMAGINARY,IMREAL,IMARGUMENT,IMCONJUGATE,IMDIV,IMPRODUCT,IMSQRT,IMSUB,IMSUM,COMPLEX` ,
+      'قاعدة بيانات': `DAVERAGE,DCOUNT,DCOUNTA,DGET,DMAX,DMIN,DPRODUCT,DSTDEV,DSTDEVP,DSUM,DVAR,DVARP`
+    };
+
+    // نحول BULK إلى بطاقات عامة (صيغة ووصف افتراضيان)
+    const bulkAsObjects = Object.entries(BULK).flatMap(([cat, csv])=>{
+      return csv.split(',').map(n=>n.trim()).filter(Boolean).map(name=>({
+        name,
+        cat: cat,
+        syntax: `=${name}(...)`,
+        desc: 'شرح مختصر: دالة Excel قياسية ضمن هذه الفئة.',
+        example: ''
+      }))
+    });
+
+    // دمج الدوال التفصيلية + الضخمة ثم إزالة التكرار بالاسم
+    const byName=new Map();
+    [...DETAILED, ...bulkAsObjects].forEach(f=>{ if(!byName.has(f.name)) byName.set(f.name,f); });
+    const FUNCTIONS=[...byName.values()].sort((a,b)=> a.name.localeCompare(b.name));
+
+    // ===== واجهة: بحث + فلاتر + بطاقات =====
+    const q=document.getElementById('q');
+    const cards=document.getElementById('cards');
+    const filtersEl=document.getElementById('filters');
+    let activeCat='الكل';
+
+    // بناء الفلاتر
+    CATS.forEach((c,i)=>{
+      const chip=document.createElement('button');
+      chip.className='chip'+(i===0?' active':'');
+      chip.textContent=c.label;
+      chip.onclick=()=>{
+        activeCat=c.key;
+        [...filtersEl.children].forEach(btn=>btn.classList.remove('active'));
+        chip.classList.add('active');
+        render();
+      };
+      filtersEl.appendChild(chip);
+    });
+
+    document.getElementById('clear').onclick=()=>{q.value='';activeCat='الكل';[...filtersEl.children].forEach((el,i)=>el.classList.toggle('active',i===0));render()};
+    q.addEventListener('input',()=>render());
+
+    function render(){
+      cards.innerHTML='';
+      // تصفية حسب الفئة
+      let list = FUNCTIONS.filter(f=> activeCat==='الكل' ? true : f.cat===activeCat);
+      // بحث بالاسم والوصف
+      const term=q.value.trim().toLowerCase();
+      if(term){ list=list.filter(f=> f.name.toLowerCase().includes(term) || (f.desc||'').toLowerCase().includes(term)); }
+
+      // بناء البطاقات (تقسيم إلى دفعات لتحسين الأداء)
+      const batch=40; let i=0;
+      function addBatch(){
+        const slice=list.slice(i,i+batch);
+        slice.forEach(f=> cards.appendChild(card(f)) );
+        i+=batch; if(i<list.length) requestAnimationFrame(addBatch);
+      }
+      addBatch();
+    }
+
+    function card(f){
+      const el=document.createElement('article'); el.className='card';
+      const h=document.createElement('div'); h.style.display='flex'; h.style.justifyContent='space-between'; h.style.alignItems='center';
+      h.innerHTML=`<h3 style="margin:0">${f.name}</h3><span class="badge">${f.cat}</span>`;
+      const syn=document.createElement('div'); syn.className='syntax'; syn.textContent=f.syntax||`=${f.name}(...)`;
+      const p=document.createElement('p'); p.textContent=f.desc||'';
+      const ex=document.createElement('div'); ex.className='example'; ex.textContent=f.example||'';
+      el.append(h,syn,p,ex);
+      return el;
+    }
+
+    // تشغيل أولي
+    render();
+  </script>
+</body>
+</html>
