@@ -24,17 +24,32 @@
     .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;margin-top:18px}
     .card{background:var(--card);border:1px solid #162332;border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;display:flex;flex-direction:column;gap:10px}
     .badge{font-size:12px;color:#b3c6d6;background:#0f2538;border:1px solid #1a3a5a;padding:4px 8px;border-radius:999px;width:max-content}
-    .syntax{font-family:monospace;color:#d6f0ff;background:#0a1220;border:1px solid #122035;padding:10px;border-radius:var(--radius-sm)}
+    .syntax{font-family:monospace;color:#d6f0ff;background:#0a1220;border:1px solid #122035;padding:10px;border-radius:var(--radius-sm);overflow:auto}
     .example{color:#cbd9e6;font-size:13px}
     .btn{padding:9px 12px;border-radius:10px;border:1px solid #203040;background:#122033;color:#e2edf6;font-size:13px;cursor:pointer}
     .btn.brand{background:linear-gradient(135deg,#3aa5ff,#2ed0ff);color:#00223a;border:none}
     .btn:active{transform:translateY(1px)}
     .footer{color:#8ea6b8;text-align:center;padding:24px}
+
     /* شاشة التحميل */
     #loader{position:fixed;inset:0;background:#070a0d;color:white;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;animation:fadeout 1s ease 5s forwards}
     @keyframes fadeout{to{opacity:0;visibility:hidden}}
     .spinner{width:50px;height:50px;border:5px solid #1a1f27;border-top:5px solid var(--brand);border-radius:50%;animation:spin 1s linear infinite;margin-bottom:20px}
     @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* النافذة المنبثقة */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:9998}
+    .modal{width:min(720px,94vw);background:#0f1621;border:1px solid #1c2a3a;border-radius:18px;box-shadow:var(--shadow)}
+    .modal header{position:relative;background:#0f1621;border-bottom:1px solid #1c2a3a;border-radius:18px 18px 0 0}
+    .modal .content{padding:16px}
+    .modal h3{margin:0;font-size:20px}
+    .modal .close{position:absolute;left:12px;top:12px;background:#182232;border:1px solid #24364a;border-radius:10px;color:#cfe8ff;padding:6px 10px;cursor:pointer}
+    .form-row{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+    .form-row input, .form-row textarea, .form-row select{flex:1;padding:12px 12px;border-radius:12px;border:1px solid #203040;background:#0a1220;color:#e9f3ff}
+    .form-row textarea{min-height:90px;resize:vertical}
+    .result{margin-top:10px;padding:12px;border-radius:12px;border:1px solid #22364a;background:#0a1522;font-family:monospace;white-space:pre-wrap}
+    .hint{color:#9fbed8;font-size:12px;margin-top:4px}
+    .danger{color:#ffd2d2}
   </style>
 </head>
 <body>
@@ -42,7 +57,6 @@
     <div class="spinner"></div>
     <h2>مرحبا مهندسيناااا الكرام ,, هذا شرح لكم بتقدروا تشاركوه مع اي حد  </h2>
     <h3>ليث عوض  </h3>
-
   </div>
 
   <header>
@@ -59,14 +73,46 @@
 
   <main class="wrap">
     <section class="grid" id="cards"></section>
-    <div class="footer">🔎 ملاحظة: النتائج تقريبية لأغراض التعلم فقط.</div>
+    <div class="footer">🔎 ملاحظة: النتائج تقريبية لأغراض التعلم فقط — بعض الدوال تم تبسيط محاكاتها.</div>
   </main>
 
-  <script>
-    // ===== شاشة التحميل: تُخفى بعد 5 ثوانٍ =====
-    setTimeout(()=>{ document.getElementById('loader').style.display='none'; }, 3500);
+  <!-- النافذة المنبثقة -->
+  <div class="modal-backdrop" id="modalBack">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header class="wrap" style="padding:14px">
+        <h3 id="modalTitle">تجربة الدالة</h3>
+        <button class="close" id="closeModal">إغلاق</button>
+      </header>
+      <div class="content">
+        <div class="syntax" id="modalSyntax"></div>
+        <p id="modalDesc" style="color:#c7d6e6;margin:10px 0 0"></p>
 
-    // ===== بيانات الفئات =====
+        <div id="dynamicInputs"></div>
+
+        <div class="form-row">
+          <button class="btn brand" id="runDemo">تنفيذ</button>
+        </div>
+        <div class="result" id="demoResult">النتيجة ستظهر هنا…</div>
+        <div class="hint" id="demoHint"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ===== شاشة التحميل: تُخفى بعد 5 ثوانٍ ===== */
+    setTimeout(()=>{ const l=document.getElementById('loader'); if(l) l.style.display='none'; }, 5000);
+
+    /* ===== أدوات مساعدة ===== */
+    const toNums = (txt)=> String(txt||'').split(/[\n,\s]+/).map(x=>parseFloat(x)).filter(x=>!Number.isNaN(x));
+    const toArr  = (txt)=> String(txt||'').split(/[\n,]+/).map(x=>x.trim()).filter(Boolean);
+    const isNum  = (v)=> !Number.isNaN(parseFloat(v));
+    const avg    = (a)=> a.length? a.reduce((x,y)=>x+y,0)/a.length : 0;
+    const median = (arr)=>{ if(!arr.length) return NaN; const s=[...arr].sort((a,b)=>a-b); const m=Math.floor(s.length/2); return s.length%2? s[m] : (s[m-1]+s[m])/2; }
+    const mode   = (arr)=>{ const m=new Map(); arr.forEach(v=> m.set(v,(m.get(v)||0)+1)); let best=null,c=-1; for(const [k,v] of m){ if(v>c){best=k;c=v} } return best }
+    const stdev  = (arr)=>{ if(arr.length<2) return 0; const a=avg(arr); const s=arr.reduce((t,v)=>t+(v-a)**2,0)/(arr.length-1); return Math.sqrt(s) }
+    const clampInt=(v,def=0)=> Number.isInteger(+v)? +v : parseInt(v)||def;
+
+    /* ===== بيانات الفئات ===== */
     const CATS=[
       {key:'الكل',label:'الكل'},
       {key:'رياضيات',label:'رياضيات'},
@@ -82,69 +128,69 @@
       {key:'متفرقات',label:'متفرقات'}
     ];
 
-    // ===== دوال تفصيلية مع تطبيق حي (عربية فقط) =====
+    /* ===== دوال مفصّلة + دوال عامة ===== */
     const DETAILED=[
-      {name:'SUM',cat:'رياضيات',syntax:'=SUM(القيمة1,القيمة2,...)',desc:'جمع الأرقام وإرجاع المجموع.',example:'=SUM(10,20,30) → 60'},
-      {name:'AVERAGE',cat:'إحصاء',syntax:'=AVERAGE(القيمة1,القيمة2,...)',desc:'حساب المتوسط الحسابي.',example:'=AVERAGE(10,20,30) → 20'},
-      {name:'PRODUCT',cat:'رياضيات',syntax:'=PRODUCT(القيمة1,القيمة2,...)',desc:'حاصل ضرب الأرقام.',example:'=PRODUCT(2,3,4) → 24'},
-      {name:'POWER',cat:'رياضيات',syntax:'=POWER(الرقم,القوة)',desc:'رفع رقم لقوة محددة.',example:'=POWER(2,3) → 8'},
-      {name:'SQRT',cat:'رياضيات',syntax:'=SQRT(الرقم)',desc:'الجذر التربيعي للرقم.',example:'=SQRT(9) → 3'},
-      {name:'RANDBETWEEN',cat:'رياضيات',syntax:'=RANDBETWEEN(أدنى,أعلى)',desc:'إرجاع رقم عشوائي بين حدين.',example:'=RANDBETWEEN(1,10) → رقم عشوائي'},
+      {name:'SUM',cat:'رياضيات',syntax:'=SUM(القيمة1,القيمة2,...)',desc:'جمع الأرقام وإرجاع المجموع.',example:'=SUM(10,20,30) → 60', demo:'list_numbers'},
+      {name:'AVERAGE',cat:'إحصاء',syntax:'=AVERAGE(القيمة1,القيمة2,...)',desc:'حساب المتوسط الحسابي.',example:'=AVERAGE(10,20,30) → 20', demo:'list_numbers'},
+      {name:'PRODUCT',cat:'رياضيات',syntax:'=PRODUCT(القيمة1,القيمة2,...)',desc:'حاصل ضرب الأرقام.',example:'=PRODUCT(2,3,4) → 24', demo:'list_numbers'},
+      {name:'POWER',cat:'رياضيات',syntax:'=POWER(الرقم,القوة)',desc:'رفع رقم لقوة محددة.',example:'=POWER(2,3) → 8', demo:'two_numbers'},
+      {name:'SQRT',cat:'رياضيات',syntax:'=SQRT(الرقم)',desc:'الجذر التربيعي للرقم.',example:'=SQRT(9) → 3', demo:'one_number'},
+      {name:'RANDBETWEEN',cat:'رياضيات',syntax:'=RANDBETWEEN(أدنى,أعلى)',desc:'إرجاع رقم عشوائي بين حدين.',example:'=RANDBETWEEN(1,10) → رقم عشوائي', demo:'two_numbers'},
 
-      {name:'MAX',cat:'إحصاء',syntax:'=MAX(القيمة1,القيمة2,...)',desc:'إرجاع أكبر قيمة.',example:'=MAX(5,9,7) → 9'},
-      {name:'MIN',cat:'إحصاء',syntax:'=MIN(القيمة1,القيمة2,...)',desc:'إرجاع أصغر قيمة.',example:'=MIN(5,9,7) → 5'},
-      {name:'MEDIAN',cat:'إحصاء',syntax:'=MEDIAN(القيمة1,القيمة2,...)',desc:'الوسيط الحسابي.',example:'=MEDIAN(5,1,9) → 5'},
-      {name:'MODE',cat:'إحصاء',syntax:'=MODE(القيمة1,القيمة2,...)',desc:'المنوال (الأكثر تكرارًا).',example:'=MODE(2,3,3,4) → 3'},
-      {name:'STDEV',cat:'إحصاء',syntax:'=STDEV(القيمة1,القيمة2,...)',desc:'الانحراف المعياري تقديريًا.',example:'=STDEV(2,4,4,4,5,5,7,9) → 2'},
+      {name:'MAX',cat:'إحصاء',syntax:'=MAX(القيمة1,القيمة2,...)',desc:'إرجاع أكبر قيمة.',example:'=MAX(5,9,7) → 9', demo:'list_numbers'},
+      {name:'MIN',cat:'إحصاء',syntax:'=MIN(القيمة1,القيمة2,...)',desc:'إرجاع أصغر قيمة.',example:'=MIN(5,9,7) → 5', demo:'list_numbers'},
+      {name:'MEDIAN',cat:'إحصاء',syntax:'=MEDIAN(القيمة1,القيمة2,...)',desc:'الوسيط الحسابي.',example:'=MEDIAN(5,1,9) → 5', demo:'list_numbers'},
+      {name:'MODE',cat:'إحصاء',syntax:'=MODE(القيمة1,القيمة2,...)',desc:'المنوال (الأكثر تكرارًا).',example:'=MODE(2,3,3,4) → 3', demo:'list_numbers'},
+      {name:'STDEV',cat:'إحصاء',syntax:'=STDEV(القيمة1,القيمة2,...)',desc:'الانحراف المعياري تقديريًا.',example:'≈ 2', demo:'list_numbers'},
 
-      {name:'LEFT',cat:'نصوص',syntax:'=LEFT(النص,[عدد])',desc:'إرجاع محارف من بداية النص.',example:'=LEFT("Excel",2) → "Ex"'},
-      {name:'RIGHT',cat:'نصوص',syntax:'=RIGHT(النص,[عدد])',desc:'إرجاع محارف من نهاية النص.',example:'=RIGHT("Excel",2) → "el"'},
-      {name:'MID',cat:'نصوص',syntax:'=MID(النص,بداية,عدد)',desc:'إرجاع جزء من النص من موضع محدد.',example:'=MID("Excel",2,3) → "xce"'},
-      {name:'LEN',cat:'نصوص',syntax:'=LEN(النص)',desc:'عدد محارف النص.',example:'=LEN("Excel") → 5'},
-      {name:'CONCAT',cat:'نصوص',syntax:'=CONCAT(نص1,نص2,...)',desc:'دمج نصوص متعددة.',example:'=CONCAT("مرحبًا ","يا ليث") → "مرحبًا يا ليث"'},
-      {name:'TEXTJOIN',cat:'نصوص',syntax:'=TEXTJOIN(فاصل,تجاهل_فارغ,نص1,...)',desc:'دمج نصوص بفاصل محدد.',example:'=TEXTJOIN(", ",TRUE,"A","B") → A, B'},
-      {name:'UPPER',cat:'نصوص',syntax:'=UPPER(النص)',desc:'تحويل إلى أحرف كبيرة.',example:'=UPPER("excel") → EXCEL'},
-      {name:'LOWER',cat:'نصوص',syntax:'=LOWER(النص)',desc:'تحويل إلى أحرف صغيرة.',example:'=LOWER("EXCEL") → excel'},
-      {name:'PROPER',cat:'نصوص',syntax:'=PROPER(النص)',desc:'تكبير أول حرف بكل كلمة.',example:'=PROPER("mohamed ali") → Mohamed Ali'},
-      {name:'TRIM',cat:'نصوص',syntax:'=TRIM(النص)',desc:'حذف المسافات الزائدة.',example:'=TRIM("  Excel  ") → "Excel"'},
-      {name:'REPLACE',cat:'نصوص',syntax:'=REPLACE(النص,موضع,عدد,نص_جديد)',desc:'استبدال جزء من النص.',example:'=REPLACE("Excel",2,3,"ABC") → EABCl'},
-      {name:'SUBSTITUTE',cat:'نصوص',syntax:'=SUBSTITUTE(النص,قديم,جديد)',desc:'تبديل كلمة بأخرى.',example:'=SUBSTITUTE("مرحبا علي","علي","ليث") → مرحبا ليث'},
+      {name:'LEFT',cat:'نصوص',syntax:'=LEFT(النص,[عدد])',desc:'إرجاع محارف من بداية النص.',example:'=LEFT("Excel",2) → "Ex"', demo:'leftRight'},
+      {name:'RIGHT',cat:'نصوص',syntax:'=RIGHT(النص,[عدد])',desc:'إرجاع محارف من نهاية النص.',example:'=RIGHT("Excel",2) → "el"', demo:'leftRight'},
+      {name:'MID',cat:'نصوص',syntax:'=MID(النص,بداية,عدد)',desc:'إرجاع جزء من النص من موضع محدد.',example:'=MID("Excel",2,3) → "xce"', demo:'mid'},
+      {name:'LEN',cat:'نصوص',syntax:'=LEN(النص)',desc:'عدد محارف النص.',example:'=LEN("Excel") → 5', demo:'text_only'},
+      {name:'CONCAT',cat:'نصوص',syntax:'=CONCAT(نص1,نص2,...)',desc:'دمج نصوص متعددة.',example:'=CONCAT("مرحبًا ","يا ليث") → "مرحبًا يا ليث"', demo:'concat'},
+      {name:'TEXTJOIN',cat:'نصوص',syntax:'=TEXTJOIN(فاصل,تجاهل_فارغ,نص1,...)',desc:'دمج نصوص بفاصل محدد.',example:'=TEXTJOIN(", ",TRUE,"A","B") → A, B', demo:'textjoin'},
+      {name:'UPPER',cat:'نصوص',syntax:'=UPPER(النص)',desc:'تحويل إلى أحرف كبيرة.',example:'=UPPER("excel") → EXCEL', demo:'text_only'},
+      {name:'LOWER',cat:'نصوص',syntax:'=LOWER(النص)',desc:'تحويل إلى أحرف صغيرة.',example:'=LOWER("EXCEL") → excel', demo:'text_only'},
+      {name:'PROPER',cat:'نصوص',syntax:'=PROPER(النص)',desc:'تكبير أول حرف بكل كلمة.',example:'=PROPER("mohamed ali") → Mohamed Ali', demo:'text_only'},
+      {name:'TRIM',cat:'نصوص',syntax:'=TRIM(النص)',desc:'حذف المسافات الزائدة.',example:'=TRIM("  Excel  ") → "Excel"', demo:'text_only'},
+      {name:'REPLACE',cat:'نصوص',syntax:'=REPLACE(النص,موضع,عدد,نص_جديد)',desc:'استبدال جزء من النص.',example:'=REPLACE("Excel",2,3,"ABC") → EABCl', demo:'replace'},
+      {name:'SUBSTITUTE',cat:'نصوص',syntax:'=SUBSTITUTE(النص,قديم,جديد)',desc:'تبديل كلمة بأخرى.',example:'=SUBSTITUTE("مرحبا علي","علي","ليث") → مرحبا ليث', demo:'substitute'},
 
-      {name:'IF',cat:'منطق',syntax:'=IF(اختبار,قيمة_إذا_صحيح,قيمة_إذا_خطأ)',desc:'شرط منطقي بسيط.',example:'=IF(90>=60,"ناجح","راسب") → "ناجح"'},
-      {name:'IFS',cat:'منطق',syntax:'=IFS(شرط1,نتيجة1,شرط2,نتيجة2,...)',desc:'شروط متعددة بدلاً من IF متداخلة.',example:'=IFS(90>=90,"ممتاز",90>=60,"ناجح")'},
-      {name:'SWITCH',cat:'منطق',syntax:'=SWITCH(تعبير,قيمة1,نتيجة1,...)',desc:'اختيار نتيجة حسب قيمة.',example:'=SWITCH(2,1,"A",2,"B",3,"C") → B'},
-      {name:'AND',cat:'منطق',syntax:'=AND(شرط1,شرط2,...)',desc:'TRUE إذا كل الشروط صحيحة.',example:'=AND(5>1,3<2) → FALSE'},
-      {name:'OR',cat:'منطق',syntax:'=OR(شرط1,شرط2,...)',desc:'TRUE إذا تحقق شرط واحد.',example:'=OR(5>1,3<2) → TRUE'},
-      {name:'NOT',cat:'منطق',syntax:'=NOT(قيمة_منطقية)',desc:'عكس القيمة المنطقية.',example:'=NOT(TRUE) → FALSE'},
+      {name:'IF',cat:'منطق',syntax:'=IF(اختبار,قيمة_إذا_صحيح,قيمة_إذا_خطأ)',desc:'شرط منطقي بسيط.',example:'=IF(90>=60,"ناجح","راسب") → "ناجح"', demo:'if_basic'},
+      {name:'IFS',cat:'منطق',syntax:'=IFS(شرط1,نتيجة1,شرط2,نتيجة2,...)',desc:'شروط متعددة بدلاً من IF متداخلة.',example:'=IFS(90>=90,"ممتاز",90>=60,"ناجح")', demo:'ifs'},
+      {name:'SWITCH',cat:'منطق',syntax:'=SWITCH(تعبير,قيمة1,نتيجة1,...)',desc:'اختيار نتيجة حسب قيمة.',example:'=SWITCH(2,1,"A",2,"B",3,"C") → B', demo:'switch'},
+      {name:'AND',cat:'منطق',syntax:'=AND(شرط1,شرط2,...)',desc:'TRUE إذا كل الشروط صحيحة.',example:'=AND(5>1,3<2) → FALSE', demo:'andor'},
+      {name:'OR',cat:'منطق',syntax:'=OR(شرط1,شرط2,...)',desc:'TRUE إذا تحقق شرط واحد.',example:'=OR(5>1,3<2) → TRUE', demo:'andor'},
+      {name:'NOT',cat:'منطق',syntax:'=NOT(قيمة_منطقية)',desc:'عكس القيمة المنطقية.',example:'=NOT(TRUE) → FALSE', demo:'not'},
 
-      {name:'DATE',cat:'تاريخ ووقت',syntax:'=DATE(سنة,شهر,يوم)',desc:'إنشاء تاريخ من مكونات.',example:'=DATE(2025,10,18)'},
-      {name:'YEAR',cat:'تاريخ ووقت',syntax:'=YEAR(تاريخ)',desc:'إرجاع السنة.',example:'=YEAR(DATE(2025,10,18)) → 2025'},
-      {name:'MONTH',cat:'تاريخ ووقت',syntax:'=MONTH(تاريخ)',desc:'إرجاع الشهر.',example:'=MONTH(DATE(2025,10,18)) → 10'},
-      {name:'DAY',cat:'تاريخ ووقت',syntax:'=DAY(تاريخ)',desc:'إرجاع اليوم.',example:'=DAY(DATE(2025,10,18)) → 18'},
-      {name:'TODAY',cat:'تاريخ ووقت',syntax:'=TODAY()',desc:'تاريخ اليوم.',example:'=TODAY()'},
-      {name:'NOW',cat:'تاريخ ووقت',syntax:'=NOW()',desc:'التاريخ والوقت الآن.',example:'=NOW()'},
-      {name:'EDATE',cat:'تاريخ ووقت',syntax:'=EDATE(تاريخ,أشهر)',desc:'تاريخ بعد/قبل أشهر.',example:'=EDATE("2024-01-01",3) → 2024-04-01'},
-      {name:'EOMONTH',cat:'تاريخ ووقت',syntax:'=EOMONTH(تاريخ,أشهر)',desc:'آخر يوم في شهر بعد/قبل أشهر.',example:'=EOMONTH("2024-01-15",1) → 2024-02-29'},
-      {name:'NETWORKDAYS',cat:'تاريخ ووقت',syntax:'=NETWORKDAYS(بدء,نهاية,[عطل])',desc:'عدد أيام العمل بين تاريخين.',example:'=NETWORKDAYS("2024-01-01","2024-01-10")'},
-      {name:'WEEKDAY',cat:'تاريخ ووقت',syntax:'=WEEKDAY(تاريخ,[نوع])',desc:'رقم يوم الأسبوع.',example:'=WEEKDAY("2024-01-01") → 2'},
-      {name:'DATEDIF',cat:'تاريخ ووقت',syntax:'=DATEDIF(بدء,نهاية,وحدة)',desc:'الفرق بين تاريخين.',example:'=DATEDIF("2024-01-01","2025-01-01","Y") → 1'},
+      {name:'DATE',cat:'تاريخ ووقت',syntax:'=DATE(سنة,شهر,يوم)',desc:'إنشاء تاريخ من مكونات.',example:'=DATE(2025,10,18)', demo:'date_build'},
+      {name:'YEAR',cat:'تاريخ ووقت',syntax:'=YEAR(تاريخ)',desc:'إرجاع السنة.',example:'=YEAR(DATE(2025,10,18)) → 2025', demo:'date_part'},
+      {name:'MONTH',cat:'تاريخ ووقت',syntax:'=MONTH(تاريخ)',desc:'إرجاع الشهر.',example:'=MONTH(DATE(2025,10,18)) → 10', demo:'date_part'},
+      {name:'DAY',cat:'تاريخ ووقت',syntax:'=DAY(تاريخ)',desc:'إرجاع اليوم.',example:'=DAY(DATE(2025,10,18)) → 18', demo:'date_part'},
+      {name:'TODAY',cat:'تاريخ ووقت',syntax:'=TODAY()',desc:'تاريخ اليوم.',example:'=TODAY()', demo:'today'},
+      {name:'NOW',cat:'تاريخ ووقت',syntax:'=NOW()',desc:'التاريخ والوقت الآن.',example:'=NOW()', demo:'now'},
+      {name:'EDATE',cat:'تاريخ ووقت',syntax:'=EDATE(تاريخ,أشهر)',desc:'تاريخ بعد/قبل أشهر.',example:'=EDATE("2024-01-01",3) → 2024-04-01', demo:'edate'},
+      {name:'EOMONTH',cat:'تاريخ ووقت',syntax:'=EOMONTH(تاريخ,أشهر)',desc:'آخر يوم في شهر بعد/قبل أشهر.',example:'=EOMONTH("2024-01-15",1) → 2024-02-29', demo:'eomonth'},
+      {name:'NETWORKDAYS',cat:'تاريخ ووقت',syntax:'=NETWORKDAYS(بدء,نهاية,[عطل])',desc:'عدد أيام العمل (دون الجمعة/السبت).',example:'=NETWORKDAYS("2024-01-01","2024-01-10")', demo:'networkdays'},
+      {name:'WEEKDAY',cat:'تاريخ ووقت',syntax:'=WEEKDAY(تاريخ,[نوع])',desc:'رقم يوم الأسبوع (الاثنين=1…الأحد=7).',example:'=WEEKDAY("2024-01-01") → 2', demo:'weekday'},
+      {name:'DATEDIF',cat:'تاريخ ووقت',syntax:'=DATEDIF(بدء,نهاية,وحدة)',desc:'الفرق بين تاريخين.',example:'=DATEDIF("2024-01-01","2025-01-01","Y") → 1', demo:'datedif'},
 
-      {name:'VLOOKUP',cat:'بحث ومراجع',syntax:'=VLOOKUP(قيمة,جدول,عمود,[تقريبي])',desc:'بحث عمودي في العمود الأول.',example:'=VLOOKUP("A12",الجدول,3,FALSE)'},
-      {name:'HLOOKUP',cat:'بحث ومراجع',syntax:'=HLOOKUP(قيمة,جدول,صف,[تقريبي])',desc:'بحث أفقي في الصف الأول.',example:'=HLOOKUP("كود",الجدول,2,0)'},
-      {name:'XLOOKUP',cat:'بحث ومراجع',syntax:'=XLOOKUP(قيمة,نطاق_بحث,نطاق_إرجاع,[غير_موجود])',desc:'بحث حديث مرن.',example:'=XLOOKUP("B07",A:A,C:C)'},
-      {name:'INDEX',cat:'بحث ومراجع',syntax:'=INDEX(نطاق,صف,[عمود])',desc:'إرجاع قيمة من موضع محدد.',example:'=INDEX(A1:B3,2,1)'},
-      {name:'MATCH',cat:'بحث ومراجع',syntax:'=MATCH(قيمة,نطاق,[نوع])',desc:'موقع قيمة داخل نطاق.',example:'=MATCH("علي",A1:A5,0)'},
-      {name:'FILTER',cat:'بحث ومراجع',syntax:'=FILTER(نطاق,شرط)',desc:'تصفية القيم حسب شرط.',example:'=FILTER(A2:B10,B2:B10>50)'},
-      {name:'SORT',cat:'بحث ومراجع',syntax:'=SORT(نطاق,[عمود],[ترتيب])',desc:'فرز نطاق.',example:'=SORT(A2:B10,1,1)'},
-      {name:'UNIQUE',cat:'بحث ومراجع',syntax:'=UNIQUE(نطاق)',desc:'إرجاع القيم الفريدة.',example:'=UNIQUE(A2:A10)'},
+      {name:'VLOOKUP',cat:'بحث ومراجع',syntax:'=VLOOKUP(قيمة,جدول,عمود,[تقريبي])',desc:'بحث عمودي في العمود الأول (محاكاة توضيحية).',example:'=VLOOKUP("A12",الجدول,3,FALSE)', demo:'vlookup'},
+      {name:'HLOOKUP',cat:'بحث ومراجع',syntax:'=HLOOKUP(قيمة,جدول,صف,[تقريبي])',desc:'بحث أفقي (محاكاة توضيحية).',example:'', demo:'hlookup'},
+      {name:'XLOOKUP',cat:'بحث ومراجع',syntax:'=XLOOKUP(قيمة,نطاق_بحث,نطاق_إرجاع,[غير_موجود])',desc:'بحث حديث مرن (محاكاة توضيحية).',example:'=XLOOKUP("B07",A:A,C:C)', demo:'xlookup'},
+      {name:'INDEX',cat:'بحث ومراجع',syntax:'=INDEX(نطاق,صف,[عمود])',desc:'إرجاع قيمة من موضع محدد.',example:'=INDEX(A1:B3,2,1)', demo:'index'},
+      {name:'MATCH',cat:'بحث ومراجع',syntax:'=MATCH(قيمة,نطاق,[نوع])',desc:'موقع قيمة داخل نطاق.',example:'=MATCH("علي",A1:A5,0)', demo:'match'},
+      {name:'FILTER',cat:'بحث ومراجع',syntax:'=FILTER(نطاق,شرط)',desc:'تصفية القيم حسب شرط.',example:'=FILTER(A2:B10,B2:B10>50)', demo:'filter'},
+      {name:'SORT',cat:'بحث ومراجع',syntax:'=SORT(نطاق,[عمود],[ترتيب])',desc:'فرز نطاق.',example:'=SORT(A2:B10,1,1)', demo:'sort'},
+      {name:'UNIQUE',cat:'بحث ومراجع',syntax:'=UNIQUE(نطاق)',desc:'إرجاع القيم الفريدة.',example:'=UNIQUE(A2:A10)', demo:'unique'},
 
-      {name:'PMT',cat:'مالية',syntax:'=PMT(النسبة,الفترات,القيمة)',desc:'دفعة القرض الدورية.',example:'=PMT(0.05/12,60,30000)'},
-      {name:'IPMT',cat:'مالية',syntax:'=IPMT(النسبة,الدفعة,الفترات,القيمة)',desc:'جزء الفائدة من الدفعة.',example:'=IPMT(0.05/12,1,60,30000)'},
-      {name:'PPMT',cat:'مالية',syntax:'=PPMT(النسبة,الدفعة,الفترات,القيمة)',desc:'جزء الأصل من الدفعة.',example:'=PPMT(0.05/12,1,60,30000)'}
+      {name:'PMT',cat:'مالية',syntax:'=PMT(النسبة,الفترات,القيمة)',desc:'دفعة القرض الدورية (محاكاة تقريبية).',example:'=PMT(0.05/12,60,30000)', demo:'pmt'},
+      {name:'IPMT',cat:'مالية',syntax:'=IPMT(النسبة,الدفعة,الفترات,القيمة)',desc:'جزء الفائدة من الدفعة (تبسيط).',example:'', demo:'ipmt'},
+      {name:'PPMT',cat:'مالية',syntax:'=PPMT(النسبة,الدفعة,الفترات,القيمة)',desc:'جزء الأصل من الدفعة (تبسيط).',example:'', demo:'ppmt'},
+      {name:'ISNUMBER',cat:'معلوماتية',syntax:'=ISNUMBER(قيمة)',desc:'هل القيمة رقم؟',example:'', demo:'isnumber'},
+      {name:'ISTEXT',cat:'معلوماتية',syntax:'=ISTEXT(قيمة)',desc:'هل القيمة نص؟',example:'', demo:'istext'}
     ];
 
-    // ===== قوائم ضخمة (أسماء فقط) تُحوّل تلقائيًا إلى بطاقات عامة =====
-    // ملاحظة: لمنع تضخم الكود، نضيف الكثير من الدوال بالاسم مع وصف عام.
     const BULK = {
       'رياضيات': `ABS,ACOS,ACOSH,ACOT,ACOTH,ASIN,ASINH,ATAN,ATAN2,ATANH,CEILING,FLOOR,ROUND,ROUNDUP,ROUNDDOWN,INT,MOD,QUOTIENT,FACT,FACTDOUBLE,COMBIN,COMBINA,PERMUT,PERMUTATIONA,PI,POWER,PRODUCT,SQRT,SQRTPI,EXP,LN,LOG,LOG10,SIGN,SIN,SINH,COS,COSH,TAN,TANH,RADIANS,DEGREES,SEC,SECH,CSC,CSCH,COT,COTH,SUMSQ,SUMX2MY2,SUMX2PY2,SUMXMY2,MROUND,RAND,RANDBETWEEN`,
       'إحصاء': `AVERAGEA,AVERAGEIF,AVERAGEIFS,COUNT,COUNTA,COUNTBLANK,COUNTIF,COUNTIFS,GEOMEAN,HARMEAN,VAR,VARA,VARP,VARPA,STDEVA,STDEVP,STDEVPA,MEDIAN,MODE,MODE.MULT,MODE.SNGL,PERCENTILE,PERCENTILE.EXC,PERCENTILE.INC,QUARTILE,QUARTILE.EXC,QUARTILE.INC,RANK,RANK.AVG,RANK.EQ,MAXA,MINA,CONFIDENCE,CONFIDENCE.NORM,CONFIDENCE.T,CHISQ.DIST,CHISQ.DIST.RT,CHISQ.INV,CHISQ.INV.RT,NORM.DIST,NORM.INV,NORM.S.DIST,NORM.S.INV,T.DIST,T.DIST.2T,T.DIST.RT,T.INV,T.INV.2T`,
@@ -154,33 +200,28 @@
       'بحث ومراجع': `ADDRESS,AREAS,CHOOSE,COLUMN,COLUMNS,FORMULATEXT,GETPIVOTDATA,HLOOKUP,HYPERLINK,INDIRECT,LOOKUP,OFFSET,ROW,ROWS,RTD,TRANSPOSE,VLOOKUP,XMATCH,INDEX,SEQUENCE,DROP,TAKE,WRAPROWS,WRAPCOLS,TOCOL,TOROW,CHOOSECOLS,CHOOSEROWS,UNIQUE,SORT,SORTBY,FILTER,XLOOKUP`,
       'مالية': `ACCRINT,ACCRINTM,AMORDEGRC,AMORLINC,COUPDAYBS,COUPDAYS,COUPDAYSNC,COUPNCD,COUPNUM,COUPPCD,DB,DDB,DISC,DOLLARDE,DOLLARFR,DURATION,EFFECT,PRICE,PRICEDISC,PRICEMAT,RECEIVED,SLN,SYD,TBILLEQ,TBILLPRICE,TBILLYIELD,YIELD,YIELDDISC,YIELDMAT,PV,FV,NOMINAL,NPER,NPV,IRR,XIRR`,
       'معلوماتية': `CELL,ERROR.TYPE,INFO,ISBLANK,ISERR,ISERROR,ISEVEN,ISFORMULA,ISLOGICAL,ISNA,ISNONTEXT,ISNUMBER,ISODD,ISREF,ISTEXT,N,NA,SHEET,SHEETS,TYPE`,
-      'هندسية': `BESSELI,BESSELJ,BESSELK,BESSELY,CONVERT,DELTA,ERF,ERFC,ERF.PRECISE,ERFC.PRECISE,GESTEP,IMSIN,IMCOS,IMTAN,IMLOG10,IMLOG2,IMLN,IMPOWER,IMABS,IMAGINARY,IMREAL,IMARGUMENT,IMCONJUGATE,IMDIV,IMPRODUCT,IMSQRT,IMSUB,IMSUM,COMPLEX` ,
+      'هندسية': `BESSELI,BESSELJ,BESSELK,BESSELY,CONVERT,DELTA,ERF,ERFC,ERF.PRECISE,ERFC.PRECISE,GESTEP,IMSIN,IMCOS,IMTAN,IMLOG10,IMLOG2,IMLN,IMPOWER,IMABS,IMAGINARY,IMREAL,IMARGUMENT,IMCONJUGATE,IMDIV,IMPRODUCT,IMSQRT,IMSUB,IMSUM,COMPLEX`,
       'قاعدة بيانات': `DAVERAGE,DCOUNT,DCOUNTA,DGET,DMAX,DMIN,DPRODUCT,DSTDEV,DSTDEVP,DSUM,DVAR,DVARP`
     };
 
-    // نحول BULK إلى بطاقات عامة (صيغة ووصف افتراضيان)
+    /* حوّل BULK إلى كائنات */
     const bulkAsObjects = Object.entries(BULK).flatMap(([cat, csv])=>{
       return csv.split(',').map(n=>n.trim()).filter(Boolean).map(name=>({
-        name,
-        cat: cat,
-        syntax: `=${name}(...)`,
-        desc: 'شرح مختصر: دالة Excel قياسية ضمن هذه الفئة.',
-        example: ''
+        name, cat, syntax:`=${name}(...)`, desc:'شرح مختصر: دالة Excel قياسية ضمن هذه الفئة.', example:''
       }))
     });
 
-    // دمج الدوال التفصيلية + الضخمة ثم إزالة التكرار بالاسم
+    /* دمج وإزالة تكرار */
     const byName=new Map();
     [...DETAILED, ...bulkAsObjects].forEach(f=>{ if(!byName.has(f.name)) byName.set(f.name,f); });
     const FUNCTIONS=[...byName.values()].sort((a,b)=> a.name.localeCompare(b.name));
 
-    // ===== واجهة: بحث + فلاتر + بطاقات =====
+    /* ===== واجهة: بحث + فلاتر + بطاقات ===== */
     const q=document.getElementById('q');
     const cards=document.getElementById('cards');
     const filtersEl=document.getElementById('filters');
     let activeCat='الكل';
 
-    // بناء الفلاتر
     CATS.forEach((c,i)=>{
       const chip=document.createElement('button');
       chip.className='chip'+(i===0?' active':'');
@@ -199,14 +240,11 @@
 
     function render(){
       cards.innerHTML='';
-      // تصفية حسب الفئة
       let list = FUNCTIONS.filter(f=> activeCat==='الكل' ? true : f.cat===activeCat);
-      // بحث بالاسم والوصف
       const term=q.value.trim().toLowerCase();
       if(term){ list=list.filter(f=> f.name.toLowerCase().includes(term) || (f.desc||'').toLowerCase().includes(term)); }
 
-      // بناء البطاقات (تقسيم إلى دفعات لتحسين الأداء)
-      const batch=40; let i=0;
+      const batch=36; let i=0;
       function addBatch(){
         const slice=list.slice(i,i+batch);
         slice.forEach(f=> cards.appendChild(card(f)) );
@@ -222,11 +260,256 @@
       const syn=document.createElement('div'); syn.className='syntax'; syn.textContent=f.syntax||`=${f.name}(...)`;
       const p=document.createElement('p'); p.textContent=f.desc||'';
       const ex=document.createElement('div'); ex.className='example'; ex.textContent=f.example||'';
-      el.append(h,syn,p,ex);
+      const actions=document.createElement('div');
+      const tryBtn=document.createElement('button'); tryBtn.className='btn brand'; tryBtn.textContent='جرّب بنفسك';
+      tryBtn.onclick=()=> openModal(f);
+      actions.appendChild(tryBtn);
+
+      el.append(h,syn,p,ex,actions);
       return el;
     }
 
-    // تشغيل أولي
+    /* ===== بيانات تجريب للبحث ===== */
+    function demoTable(){
+      return [
+        {كود:'A12', منتج:'فلاش USB', سعر:6.5, مخزون: 42},
+        {كود:'B07', منتج:'لوحة مفاتيح', سعر:17.9, مخزون: 12},
+        {كود:'C33', منتج:'فأرة لاسلكية', سعر:11.0, مخزون: 5},
+        {كود:'D21', منتج:'سماعة رأس', سعر:23.0, مخزون: 27}
+      ];
+    }
+    function demoMatrix(){ return demoTable().map(r=>[r.كود,r.منتج,r.سعر,r.مخزون]); }
+
+    /* ===== محرك تنفيذ مبسّط لدوال شائعة ===== */
+    const EVAL_HANDLERS={
+      // رياضيات/إحصاء أساسية
+      SUM: (args)=> toNums(args.join(',')).reduce((a,b)=>a+b,0),
+      AVERAGE: (args)=> avg(toNums(args.join(','))),
+      PRODUCT: (args)=> toNums(args.join(',')).reduce((a,b)=>a*b,1),
+      MAX: (args)=> Math.max(...toNums(args.join(','))),
+      MIN: (args)=> Math.min(...toNums(args.join(','))),
+      MEDIAN: (args)=> median(toNums(args.join(','))),
+      MODE: (args)=> mode(toNums(args.join(','))),
+      STDEV: (args)=> stdev(toNums(args.join(','))),
+      ABS: ([x])=> Math.abs(parseFloat(x)||0),
+      INT: ([x])=> Math.trunc(parseFloat(x)||0),
+      ROUND: ([x,n=0])=> { x=parseFloat(x)||0; n=clampInt(n,0); const f=Math.pow(10,n); return Math.round(x*f)/f; },
+      ROUNDUP: ([x,n=0])=> { x=parseFloat(x)||0; n=clampInt(n,0); const f=Math.pow(10,n); return Math.ceil(x*f)/f; },
+      ROUNDDOWN: ([x,n=0])=> { x=parseFloat(x)||0; n=clampInt(n,0); const f=Math.pow(10,n); return Math.floor(x*f)/f; },
+      CEILING: ([x,signif=1])=> { x=parseFloat(x)||0; signif=parseFloat(signif)||1; return Math.ceil(x/signif)*signif; },
+      FLOOR: ([x,signif=1])=> { x=parseFloat(x)||0; signif=parseFloat(signif)||1; return Math.floor(x/signif)*signif; },
+      MOD: ([x,d])=> ((parseFloat(x)||0) % (parseFloat(d)||1)),
+      QUOTIENT: ([n,d])=> Math.trunc((parseFloat(n)||0)/(parseFloat(d)||1)),
+      FACT: ([n])=> {n=clampInt(n,0); let r=1; for(let i=2;i<=n;i++) r*=i; return r;},
+      POWER: ([x,y])=> Math.pow(parseFloat(x)||0, parseFloat(y)||0),
+      SQRT: ([x])=> Math.sqrt(parseFloat(x)||0),
+      EXP: ([x])=> Math.exp(parseFloat(x)||0),
+      LN: ([x])=> Math.log(parseFloat(x)||1),
+      LOG10: ([x])=> Math.log10(parseFloat(x)||1),
+      LOG: ([x,base=10])=> Math.log(parseFloat(x)||1)/Math.log(parseFloat(base)||10),
+      SIGN: ([x])=> Math.sign(parseFloat(x)||0),
+      SIN: ([x])=> Math.sin(parseFloat(x)||0),
+      COS: ([x])=> Math.cos(parseFloat(x)||0),
+      TAN: ([x])=> Math.tan(parseFloat(x)||0),
+      RADIANS: ([deg])=> (parseFloat(deg)||0) * Math.PI/180,
+      DEGREES: ([rad])=> (parseFloat(rad)||0) * 180/Math.PI,
+      RAND: ()=> Math.random(),
+      RANDBETWEEN: ([a,b])=> { a=parseInt(a); b=parseInt(b); const lo=Math.min(a,b), hi=Math.max(a,b); return Math.floor(Math.random()*(hi-lo+1))+lo; },
+
+      // نصوص
+      LEFT: ([t,n=1])=> String(t).substring(0, clampInt(n,1)),
+      RIGHT: ([t,n=1])=> {t=String(t); return t.substring(Math.max(0,t.length-clampInt(n,1)));},
+      MID: ([t,start,num])=> String(t).substring(clampInt(start,1)-1, (clampInt(start,1)-1)+clampInt(num,1)),
+      LEN: ([t])=> String(t).length,
+      TRIM: ([t])=> String(t).replace(/\s+/g,' ').trim(),
+      UPPER: ([t])=> String(t).toUpperCase(),
+      LOWER: ([t])=> String(t).toLowerCase(),
+      PROPER: ([t])=> String(t).split(/\s+/).map(w=>w? w[0].toUpperCase()+w.slice(1).toLowerCase() : '').join(' '),
+      CONCAT: (...parts)=> parts.join(''),
+      CONCATENATE: (...parts)=> parts.join(''),
+      TEXTJOIN: ([sep,ignoreEmpty, ...rest])=> { const skip = /^TRUE$/i.test(String(ignoreEmpty)); return rest.filter(p=> skip? String(p).trim()!=='' : true).join(sep); },
+
+      // منطق
+      AND: (...args)=> args.every(v=> !!JSON.parse(String(v).replace(/'/g,'"')).valueOf? !!v : !!v),
+      OR:  (...args)=> args.some(v=> !!v),
+      NOT: ([v])=> !(/^(true|1)$/i.test(String(v)) ? true : false),
+      IF: ([cond, a, b])=> (/^(true|1)$/i.test(String(cond)) ? a : b),
+
+      // تاريخ ووقت
+      DATE: ([y,m,d])=> new Date(parseInt(y), parseInt(m)-1, parseInt(d)).toISOString().slice(0,10),
+      YEAR: ([date])=> new Date(date).getFullYear(),
+      MONTH: ([date])=> new Date(date).getMonth()+1,
+      DAY: ([date])=> new Date(date).getDate(),
+      TODAY: ()=> new Date().toISOString().slice(0,10),
+      NOW: ()=> new Date().toISOString(),
+      DATEDIF: ([a,b,u])=> { const d1=new Date(a), d2=new Date(b); const days=Math.floor((d2-d1)/(1000*60*60*24)); if(u==='Y')return Math.floor(days/365.2425); if(u==='M')return Math.floor(days/30.4369); return days; },
+      EDATE: ([date,months])=> { const d=new Date(date); d.setMonth(d.getMonth()+parseInt(months||0)); return d.toISOString().slice(0,10) },
+      EOMONTH: ([date,months])=> { const d=new Date(date); d.setMonth(d.getMonth()+parseInt(months||0)+1,0); d.setHours(0,0,0,0); return d.toISOString().slice(0,10) },
+      NETWORKDAYS: ([a,b])=> { const d1=new Date(a), d2=new Date(b); let days=0; for(let d=new Date(d1); d<=d2; d.setDate(d.getDate()+1)){ const w=d.getDay(); if(w!==5 && w!==6) days++; } return days; }, // (الجمعة=5، السبت=6)
+      WEEKDAY: ([date])=> { const n=new Date(date).getDay(); return n===0?7:n; },
+
+      // بحث ومراجع (توضيحية)
+      VLOOKUP: ([value])=> { const row = demoTable().find(r=> r.كود.toLowerCase() === String(value).trim().toLowerCase()); return row || 'غير موجود'; },
+      HLOOKUP: ([value])=> { const row = demoTable().find(r=> r.كود.toLowerCase() === String(value).trim().toLowerCase()); return row ? Object.values(row) : 'غير موجود'; },
+      XLOOKUP: ([value])=> { const row = demoTable().find(r=> r.كود.toLowerCase() === String(value).trim().toLowerCase()); return row || 'غير موجود'; },
+      INDEX: ([r,c])=> demoMatrix()[clampInt(r,1)-1]?.[clampInt(c,1)-1] ?? '',
+      MATCH: ([val])=> { const arr=demoMatrix().map(r=>r[0]); return arr.indexOf(val)+1 },
+
+      FILTER: ([minStock])=> JSON.stringify(demoTable().filter(r=> r.مخزون >= (+minStock||0)), null, 2),
+      SORT: ([col='سعر',order='ASC'])=> JSON.stringify(demoTable().slice().sort((a,b)=> (order==='ASC'?1:-1) * (a[col]-b[col])), null, 2),
+      UNIQUE: ()=> JSON.stringify([...new Set(demoTable().map(r=>r.منتج))], null, 2),
+
+      // مالية (تقريبية)
+      PMT: ([rate,nper,pv])=> { const r=parseFloat(rate), n=parseInt(nper), P=parseFloat(pv); if(!r) return -(P/n); return -(P*r)/(1-Math.pow(1+r,-n)); },
+      IPMT: ([rate,per,nper,pv])=>{ const r=parseFloat(rate), P=parseFloat(pv); const bal = (per-1===0)? P : -EVAL_HANDLERS.PMT([rate,nper,pv]) * ((1-Math.pow(1+r, -(per-1)))/r) - P; return bal*r; },
+      PPMT: ([rate,per,nper,pv])=>{ const pmt = EVAL_HANDLERS.PMT([rate,nper,pv]); const ipmt = EVAL_HANDLERS.IPMT([rate,per,nper,pv]); return pmt - ipmt; },
+
+      ISNUMBER: ([v])=> isNum(v),
+      ISTEXT:   ([v])=> typeof v==='string'
+    };
+
+    /* ===== النافذة المنبثقة ===== */
+    const modalBack=document.getElementById('modalBack');
+    const closeModalBtn=document.getElementById('closeModal');
+    const modalTitle=document.getElementById('modalTitle');
+    const modalSyntax=document.getElementById('modalSyntax');
+    const modalDesc=document.getElementById('modalDesc');
+    const dynamicInputs=document.getElementById('dynamicInputs');
+    const runDemoBtn=document.getElementById('runDemo');
+    const demoResult=document.getElementById('demoResult');
+    const demoHint=document.getElementById('demoHint');
+
+    let currentFn=null;
+
+    function openModal(f){
+      currentFn=f;
+      modalTitle.textContent = `تجربة الدالة: ${f.name}`;
+      modalSyntax.textContent = f.syntax || `=${f.name}(...)`;
+      modalDesc.textContent = f.desc || '';
+      demoResult.textContent = 'النتيجة ستظهر هنا…';
+      demoHint.textContent = '';
+      buildInputsFor(f);
+      modalBack.style.display='flex';
+    }
+
+    function closeModal(){ modalBack.style.display='none'; }
+    closeModalBtn.onclick=closeModal;
+    modalBack.addEventListener('click', (e)=>{ if(e.target===modalBack) closeModal(); });
+
+    function buildInputsFor(f){
+      dynamicInputs.innerHTML='';
+      // أنماط واجهات سريعة وفق الدالة/الفئة
+      const name=f.name.toUpperCase();
+
+      // واجهات مخصّصة لعدد من الأصناف:
+      const addRow = (label, html)=> {
+        const row=document.createElement('div');
+        row.className='form-row';
+        const lab=document.createElement('div');
+        lab.style.minWidth='120px'; lab.style.color='#b6c2ce'; lab.style.padding='10px 0';
+        lab.textContent=label;
+        const box=document.createElement('div'); box.style.flex='1';
+        box.innerHTML=html;
+        row.append(lab, box);
+        dynamicInputs.appendChild(row);
+      };
+
+      // ضبط حسب اسم الدالة إن كانت ضمن المدعومين
+      if(['SUM','AVERAGE','PRODUCT','MAX','MIN','MEDIAN','MODE','STDEV'].includes(name)){
+        addRow('القيم', `<textarea id="in_list" placeholder="مثال: 10, 20, 35, 7"></textarea><div class="hint">أدخل أرقامًا مفصولة بفواصل أو أسطر.</div>`);
+      } else if(['LEFT','RIGHT'].includes(name)){
+        addRow('النص', `<input id="in_text" placeholder="نص" />`);
+        addRow('العدد', `<input id="in_num" type="number" value="2" />`);
+      } else if(name==='MID'){
+        addRow('النص', `<input id="in_text" placeholder="نص" />`);
+        addRow('البداية', `<input id="in_start" type="number" value="2" />`);
+        addRow('العدد', `<input id="in_len" type="number" value="3" />`);
+      } else if(['LEN','TRIM','UPPER','LOWER','PROPER'].includes(name)){
+        addRow('النص', `<input id="in_text" placeholder="نص" />`);
+      } else if(['CONCAT','CONCATENATE'].includes(name)){
+        addRow('النصوص', `<textarea id="in_list" placeholder="مثال:\nمرحبا\n يا\n ليث"></textarea>`);
+      } else if(name==='TEXTJOIN'){
+        addRow('الفاصل', `<input id="in_sep" placeholder=", " value=", " />`);
+        addRow('تجاهل الفارغ؟', `<select id="in_skip"><option value="TRUE">TRUE</option><option value="FALSE">FALSE</option></select>`);
+        addRow('النصوص', `<textarea id="in_list" placeholder="A\n \nB\nC"></textarea>`);
+      } else if(['IF','AND','OR','NOT'].includes(name)){
+        addRow('المعاملات', `<input id="in_args" placeholder='مثال IF: true, "ناجح", "راسب"' />`);
+      } else if(['POWER'].includes(name)){
+        addRow('الرقم', `<input id="in_a" type="number" value="2" />`);
+        addRow('القوة', `<input id="in_b" type="number" value="3" />`);
+      } else if(['SQRT','ABS','INT','ROUND','ROUNDUP','ROUNDDOWN','CEILING','FLOOR','EXP','LN','LOG','LOG10','SIGN','SIN','COS','TAN','RADIANS','DEGREES'].includes(name)){
+        addRow('المعاملات', `<input id="in_args" placeholder="مثال: 9 أو 3,2 لـ ROUND" />`);
+      } else if(['RAND','RANDBETWEEN'].includes(name)){
+        addRow('المعاملات', `<input id="in_args" placeholder="مثال RANDBETWEEN: 1,10 (RAND بدون مدخلات)" />`);
+      } else if(['DATE','YEAR','MONTH','DAY','TODAY','NOW','DATEDIF','EDATE','EOMONTH','NETWORKDAYS','WEEKDAY'].includes(name)){
+        addRow('المعاملات', `<input id="in_args" placeholder='أمثلة:\nDATE: 2025,10,18\nDATEDIF: 2024-01-01,2025-01-01,Y' />`);
+      } else if(['VLOOKUP','HLOOKUP','XLOOKUP','INDEX','MATCH','FILTER','SORT','UNIQUE'].includes(name)){
+        addRow('المعاملات', `<input id="in_args" placeholder='أمثلة:\nVLOOKUP: A12\nMATCH: B07\nFILTER: 10 (حد أدنى للمخزون)' />`);
+        const tbl=document.createElement('div');
+        tbl.className='hint';
+        tbl.textContent='جدول توضيحي داخلي: كود A12/B07/C33/D21 مع السعر والمخزون.';
+        dynamicInputs.appendChild(tbl);
+      } else if(['PMT','IPMT','PPMT'].includes(name)){
+        addRow('المعاملات', `<input id="in_args" placeholder="PMT: معدل,فترات,قيمة | مثال: 0.05/12,60,30000" />`);
+        dynamicInputs.insertAdjacentHTML('beforeend','<div class="hint">الحسابات تقريبية للتوضيح.</div>');
+      } else if(['ISNUMBER','ISTEXT'].includes(name)){
+        addRow('القيمة', `<input id="in_value" placeholder="123 أو نص" />`);
+      } else {
+        // واجهة عامة لأي دالة أخرى
+        addRow('المعاملات', `<input id="in_args" placeholder="أدخل المعاملات مفصولة بفواصل (مثال: 10,20,30)" />`);
+        dynamicInputs.insertAdjacentHTML('beforeend','<div class="hint">محاكٍ عام: إن لم تكن الدالة مدعومة، سنعرض الصيغة فقط.</div>');
+      }
+    }
+
+    runDemoBtn.onclick=()=>{
+      if(!currentFn) return;
+      const name=currentFn.name.toUpperCase();
+
+      // جمع الوسائط من الحقول المختلفة
+      let args=[];
+      if(document.getElementById('in_list')) args = toArr(document.getElementById('in_list').value);
+      if(document.getElementById('in_args')) args = toArr(document.getElementById('in_args').value);
+      if(document.getElementById('in_text')) args = [document.getElementById('in_text').value, ...(args||[])];
+      if(document.getElementById('in_num')) args = [document.getElementById('in_num').value];
+      if(document.getElementById('in_sep')){
+        const sep=document.getElementById('in_sep').value;
+        const skip=document.getElementById('in_skip')?.value ?? 'FALSE';
+        const list=document.getElementById('in_list')?.value ?? '';
+        args=[sep, skip, ...toArr(list.replace(/\n/g,','))];
+      }
+      if(document.getElementById('in_start') && document.getElementById('in_len')){
+        const t=document.getElementById('in_text')?.value ?? '';
+        const s=document.getElementById('in_start').value;
+        const n=document.getElementById('in_len').value;
+        args=[t,s,n];
+      }
+      if(document.getElementById('in_a') && document.getElementById('in_b')){
+        const a=document.getElementById('in_a').value;
+        const b=document.getElementById('in_b').value;
+        args=[a,b];
+      }
+      if(document.getElementById('in_value')) args=[document.getElementById('in_value').value];
+
+      // تنفيذ إن كان هناك معالج
+      if(EVAL_HANDLERS[name]){
+        try{
+          const res = Array.isArray(args) ? EVAL_HANDLERS[name](args) : EVAL_HANDLERS[name]([args]);
+          demoResult.textContent = (res instanceof Date) ? res.toISOString() :
+                                   (typeof res==='object' ? JSON.stringify(res,null,2) : String(res));
+          demoHint.innerHTML = '';
+        }catch(e){
+          demoResult.innerHTML = `<span class="danger">خطأ أثناء التنفيذ:</span> ${e.message}`;
+          demoHint.textContent = '';
+        }
+      }else{
+        // عرض الصيغة فقط للدوال غير المدعومة
+        const display = `=${name}(${(args||[]).join(', ')})`;
+        demoResult.textContent = display;
+        demoHint.textContent = 'هذه الدالة غير مفعّلة حاليًا في المحاكي — نعرض لك الصيغة كتمرين شكلي.';
+      }
+    };
+
+    /* تشغيل أولي */
     render();
   </script>
 </body>
